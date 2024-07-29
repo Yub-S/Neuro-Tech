@@ -1,23 +1,38 @@
 import dotenv
 import os
+import openai
 from dotenv import load_dotenv
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import HumanMessage
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
 import mysql.connector 
 from mysql.connector import Error
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.prompts import PromptTemplate
 
 load_dotenv()
-api_key = os.getenv('GOOGLE_API_KEY')
-
+# api_key = os.getenv('GOOGLE_API_KEY')
+api_key = os.getenv('AI71_API_KEY')
 llm = ChatGoogleGenerativeAI(model='gemini-1.5-flash')
+AI71_BASE_URL = "https://api.ai71.ai/v1/"
+
+chat = ChatOpenAI(
+    model="tiiuae/falcon-180B-chat",
+    api_key=api_key,
+    base_url=AI71_BASE_URL,
+    streaming=True,
+)
+
+api_key = os.getenv('AI71_API_KEY')
+client = openai.OpenAI(api_key=api_key,base_url=AI71_BASE_URL)
 
 def book_appointment(doctor_name,patient_info):
     connection = mysql.connector.connect(
         host='localhost',
         database='hospital',
         user='root',
-        password='xxxxxxxx'
+        password='xxxxxxx'
     )
     if connection.is_connected():
         cursor = connection.cursor()
@@ -43,7 +58,7 @@ def retrieve_database_info():
         host='localhost',
         database='hospital',
         user='root',
-        password='nepal2015'
+        password='xxxxxxx'
     )
     doctor_list = []
     if connection.is_connected():
@@ -59,33 +74,24 @@ def retrieve_database_info():
     return doctors_info
 if __name__ == "__main__":
       
-        prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system","""You are a helpful assistant for answering questions of persons that are looking for booking an appointment to a doctor.
-                you will be provided various information about doctors and you need to answer question using those informations.
-                here is the doctors informations :
-                {doctors_info}
-
-                if the person says, he/she wants to have a appointment scheduled for specific doctor, ask them about their fullname,contact number and the appointment_day. and return it with a dictionary of them with a additional key appointment as yes.
-                """
-            ),
-            (
-                "human","{question}"
-            )
-        ]
-    )
-        chain = prompt | llm
         doctors_info = retrieve_database_info()
 
         question = input("How can I help you? ")
         
-        response = chain.invoke(
-            {
-                'doctors_info': doctors_info,
-                'question': question
-            }
+        template = ("""You are a helpful assistant for answering questions of persons that are looking for booking an appointment to a doctor.
+            you will be provided various information about doctors and you need to answer question using those informations.return your answer as a json with key being answer.
+            here is the doctors informations :
+            {doctors_info}
+                  
+            if the user confirms to schedule the meeting with a doctor, ask his/her fullname,contact_details,appointment_time,doctor's name. and send it as a json.      """
         )
 
-        response_content = response.content
-        print(response_content)
+        prompt = PromptTemplate(template=template,input_variables=["doctor_info","question"])
+
+        chain = prompt | chat | JsonOutputParser()
+
+        response = chain.invoke(
+             [doctors_info,question]
+         )
+        
+        print(response['answer'])
