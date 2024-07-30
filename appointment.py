@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
         question = input("How can I help you? ")
         
-        template = ("""You are a helpful assistant for answering questions of persons that are looking for booking an appointment to a doctor.
+        template1 = ("""You are a helpful assistant for answering questions of persons that are looking for booking an appointment to a doctor.
             you will be provided various information about doctors and you need to answer question using those informations.return your answer as a json with key being answer.
             here is the doctors informations :
             {doctors_info}
@@ -86,12 +86,21 @@ if __name__ == "__main__":
             if the user confirms to schedule the meeting with a doctor, ask his/her fullname,contact_details,appointment_time,doctor's name. and send it as a json.      """
         )
 
-        prompt = PromptTemplate(template=template,input_variables=["doctor_info","question"])
+        prompt1 = PromptTemplate(template=template1,input_variables=["doctor_info","question"])
 
-        chain = prompt | chat | JsonOutputParser()
+        chain1 = prompt1 | chat | JsonOutputParser()
 
-        response = chain.invoke(
+        response1 = chain1.invoke(
              [doctors_info,question]
          )
+
+        template2 = ("""you are a response checker that checks whether the reponse from the previous model has a personal information of a person mainly: fullname,contact no, doctors name and a appointment_day.
+                    if it does contain that reply Yes as a josn with key schedule_appointment . else reply No.
+                    here is the response :
+                    {response} """)
         
-        print(response['answer'])
+        prompt2 = PromptTemplate(template=template2,input_variables=['response'])
+
+        chain2 = prompt2 | chat | JsonOutputParser()
+        response2 = chain2.invoke([response1['answer']])
+        print(response2)
