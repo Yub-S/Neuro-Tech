@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import streamlit as st
 import mysql.connector
 import json
+import re
 
 # Load environment variables
 load_dotenv()
@@ -27,7 +28,6 @@ def book_appointment(doctor_name, patient_info):
         fetch_query = """SELECT appointment_booked FROM doctors WHERE full_name = %s"""
         cursor.execute(fetch_query, (doctor_name,))
         result = cursor.fetchone()
-        print(result)
         if result:
             current_appointments = result[0]
             new_appointments = current_appointments + 1
@@ -35,9 +35,8 @@ def book_appointment(doctor_name, patient_info):
             cursor.execute(update_query, (new_appointments, doctor_name))
             connection.commit()
             query = """INSERT INTO patients (full_name, problem, doctor_booked, appointment_day) 
-                    VALUES (%s, %s, %s, %s)"""
-            cursor.execute(query, (patient_info['full_name'], patient_info['problem'], doctor_name, patient_info['appointment_day']))
-            print(f"Appointment booked successfully for {doctor_name}")
+                       VALUES (%s, %s, %s, %s)"""
+            cursor.execute(query, (patient_info['name'], patient_info['contact'], doctor_name, patient_info['preferred_day']))
             connection.commit()
         connection.close()
 
@@ -67,17 +66,18 @@ doctors_info = retrieve_database_info()
 # Initialize the chat history
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content": "You are a hospital's chatbot that answers questions from people wanting to book an appointment with a doctor. You have access to the hospital's doctor information to answer their questions."},
+        {"role": "system", "content": "You are a hospital's chatbot that responds to people wanting to book an appointment with a doctor. You have access to the hospital's doctor information to answer their questions."},
         {"role": "system", "content": f"Here is the doctor's information: {doctors_info}"},
         {"role": "system", "content": """
-        If a user asks a normal question, respond with the relevant information and set 'schedule' to 'no'.
-        If a user wants to book an appointment, ask for their full name, contact details, preferred appointment day, and the doctor they want to see. 
-        Wrap this information in a dictionary format with keys: 'patient_info' and 'schedule', setting 'schedule' to 'yes'.
-        Example for booking an appointment:
-        {"patient_info": {"name": "John Doe", "contact": "123-456-7890", "preferred_day": "Monday", "doctor": "Dr. Smith"}, "schedule": "yes"}
-        Example for normal questions:
-        {"response": "Dr. Smith is available on Mondays and Wednesdays.", "schedule": "no"}
-        """}
+If a user asks a normal question, respond with the relevant information in a dictionary format as shown below and set 'schedule' to 'no'.
+Example for normal questions:
+{"response": "Dr. Smith is available on Mondays and Wednesdays.", "schedule": "no"}
+
+If a user wants to book an appointment, ask for their full name, contact details, preferred appointment day, and the doctor they want to see. Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
+
+Example for booking an appointment after the user provides the details:
+{"response": "Your appointment with the doctor has been scheduled for the given day.", "patient_info": {"name": "John Doe", "contact": "123-456-7890", "preferred_day": "Monday", "doctor": "Dr. Smith"}, "schedule": "yes"}
+"""}
     ]
 
 # Display chat messages excluding system messages
@@ -104,20 +104,24 @@ if question:
             ],
             stream=False,
         )
-        response = generated.choices[0].message.content
-        
+        response_content = generated.choices[0].message.content
+        # st.markdown(response_content)
+
         try:
-            response_dict = json.loads(response)  # Convert the response string to a dictionary
+            # Extract JSON from the response content
+            json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+            if json_match:
+                response_dict = json.loads(json_match.group())
+                if response_dict['schedule'] == 'no':
+                    st.markdown(response_dict['response'])
+                elif response_dict['schedule'] == 'yes':
+                    patient_info = response_dict['patient_info']
+                    book_appointment(patient_info['doctor'], patient_info)
+                    st.markdown(response_dict['response'])
+            else:
+                st.error("No valid JSON found in the response.")
         except json.JSONDecodeError:
-            response_dict = {"response": response, "schedule": "no"}
-
-        if response_dict['schedule'] == 'no':
-            st.markdown(response_dict['response'])
-
-        elif response_dict['schedule'] == 'yes':
-            patient_info = response_dict['patient_info']
-            book_appointment(patient_info['doctor'], patient_info)
-            st.markdown("Your appointment has been booked successfully.")
+            st.error("Failed to parse response as JSON.")
 
     # Add the assistant's response to the history
-    st.session_state.messages.append({"role": "assistant", "content": response_dict['response']})
+    st.session_state.messages.append({"role": "assistant", "content": response_content})
