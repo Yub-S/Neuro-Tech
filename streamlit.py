@@ -15,39 +15,51 @@ client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
 st.title("Appointment-Scheduler")
 
+connection = mysql.connector.connect(
+    host='localhost',
+    database='hospital',
+    user='root',
+    password=os.getenv('mysql_password')
+)
+
 # Book appointment function
 def book_appointment(doctor_name, patient_info):
-    connection = mysql.connector.connect(
-        host='localhost',
-        database='hospital',
-        user='root',
-        password='nepal2015'
-    )
     if connection.is_connected():
         cursor = connection.cursor()
-        fetch_query = """SELECT appointment_booked FROM doctors WHERE full_name = %s"""
+
+        # Fetch the current available_time_slots for the doctor
+        fetch_query = """SELECT  available_time_slots FROM doctors WHERE full_name = %s"""
         cursor.execute(fetch_query, (doctor_name,))
         result = cursor.fetchone()
+
         if result:
-            current_appointments = result[0]
-            new_appointments = current_appointments + 1
-            update_query = """UPDATE doctors SET appointment_booked = %s WHERE full_name = %s"""
-            cursor.execute(update_query, (new_appointments, doctor_name))
-            connection.commit()
-            query = """INSERT INTO patients (full_name, problem, doctor_booked, appointment_day) 
-                       VALUES (%s, %s, %s, %s)"""
-            cursor.execute(query, (patient_info['name'], patient_info['contact'], doctor_name, patient_info['preferred_day']))
-            connection.commit()
+            available_time_slots = result[0].split(", ")  # Convert the available_time_slots string to a list
+
+            preferred_time_slot = patient_info['preferred_time_slot']
+
+            if preferred_time_slot in available_time_slots:
+                # Slot is available, proceed with booking
+                available_time_slots.remove(preferred_time_slot)  # Remove the booked slot
+
+                # Update the doctor's appointment_booked and available_time_slots
+                update_query = """UPDATE doctors SET available_time_slots = %s WHERE full_name = %s"""
+                cursor.execute(update_query, (", ".join(available_time_slots), doctor_name))
+                connection.commit()
+
+                # Insert patient info into patients table
+                insert_query = """INSERT INTO patients (full_name, problem,contact, doctor_booked, appointment_day, appointmnet_time) 
+                                  VALUES (%s, %s, %s, %s, %s)"""
+                cursor.execute(insert_query, (patient_info['name'],patient_info['problem'], patient_info['contact'], doctor_name, patient_info['preferred_day'], preferred_time_slot))
+                connection.commit()
+                st.markdown("Appointment booked successfully.")
+            else:
+                # Slot is not available
+                st.markdown("The selected time slot is occupied. Please choose another time slot.")
+        
         connection.close()
 
 # Function to retrieve doctors' information from the database
 def retrieve_database_info():
-    connection = mysql.connector.connect(
-        host='localhost',
-        database='hospital',
-        user='root',
-        password='nepal2015'
-    )
     doctor_list = []
     if connection.is_connected():
         cursor = connection.cursor()
@@ -69,16 +81,14 @@ if "messages" not in st.session_state:
         {"role": "system", "content": "You are a hospital chatbot that answers doctor-related questions and books appointments. You have access to the hospital's doctor information."},
         {"role": "system", "content": f"Doctor's information: {doctors_info}"},
         {"role": "system", "content": """
- If the user asks a general question or inquiries about a doctor,convey suitable doctor's information that is provided to you to the user. always, recommend doctor based on the user's problem and doctor's specialization. your answer should be in a dictionary format as shown below:
-{"response": "Your answer here", "schedule": "no"}
+ If the user asks a general conversational question or inquiries about a doctor,convey suitable doctor's information that is provided to you to the user. always, recommend doctor based on the user's problem and doctor's specialization. your answer should be in following format:
+{"response": "Your response to the question here", "schedule": "no"}
 
-If a user wants to book an appointment, ask for their full name, contact details, preferred appointment day, and the doctor they want to see. Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
-
+If a user says/wants to book an appointment, ask for their full name,problem(if you don't know),contact details, preferred appointment day, preferred appointment time, and the doctor they want to see(if you don't know). Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
 Example for booking an appointment after the user provides the details:
-{"response": "Your appointment with the doctor has been scheduled for the given day.", "patient_info": {"name": "John Doe", "contact": "123-456-7890", "preferred_day": "Monday", "doctor": "Dr. Smith"}, "schedule": "yes"}
+{"response": "sure,wait a minute....", "patient_info": {"name": "John Doe","problem":"backpain","contact": "123-456-7890", "preferred_day": "Monday","preferred_time":"12-12:30","doctor": "Dr. Smith"}, "schedule": "yes"}
 """}
     ]
-
 # Display chat messages excluding system messages
 for message in st.session_state.messages:
     if message["role"] != "system":
@@ -117,7 +127,6 @@ if question:
             stream=False,
         )
         response_content = generated.choices[0].message.content
-        # st.markdown(response_content)
 
         try:
             # Extract JSON from the response content
@@ -131,7 +140,6 @@ if question:
                     book_appointment(patient_info['doctor'], patient_info)
                     st.markdown(response_dict['response'])
 
-                # response_content=response_dict['response']
             else:
                 st.error("No valid JSON found in the response.")
         except json.JSONDecodeError:
