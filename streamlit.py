@@ -5,6 +5,10 @@ import streamlit as st
 import mysql.connector
 import json
 import re
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
 
 # Load environment variables
 load_dotenv()
@@ -15,7 +19,40 @@ client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
 st.title("Appointment-Scheduler")
 
-    
+def send_emails(patient_info, text_to_send):
+    try:
+        # Email server setup
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+
+        # Login credentials (use environment variables for security)
+        sender_email = os.getenv('email')
+        sender_password = os.getenv('password')
+        server.login(sender_email, sender_password)
+
+        # Compose the email
+        subject = "Appointment Confirmation"
+        body = f"Appointment booked successfully for {patient_info['name']} on {patient_info['preferred_day']} at {patient_info['preferred_time']}"
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = patient_info['contact']
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Send the email
+        server.send_message(msg)
+        print("Mail sent")
+
+
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+    finally:
+        # Close the server connection
+        server.quit()
+
+
 #Book appointment function
 def book_appointment(patient_info):
     connection = mysql.connector.connect(
@@ -57,7 +94,9 @@ def book_appointment(patient_info):
             ))
             connection.commit()
 
-            st.markdown("Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time))
+            marking="Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time)
+            st.markdown(marking)
+            send_emails(patient_info,marking) 
 
         connection.close()
 
