@@ -15,86 +15,191 @@ client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
 st.title("Appointment-Scheduler")
 
-connection = mysql.connector.connect(
+    
+#Book appointment function
+def book_appointment(patient_info):
+    connection = mysql.connector.connect(
     host='localhost',
     database='hospital',
     user='root',
     password=os.getenv('mysql_password')
 )
-
-# Book appointment function
-def book_appointment(doctor_name, patient_info):
+    
     if connection.is_connected():
         cursor = connection.cursor()
 
-        # Fetch the current available_time_slots for the doctor
-        fetch_query = """SELECT  available_time_slots FROM doctors WHERE full_name = %s"""
-        cursor.execute(fetch_query, (doctor_name,))
+        # Extract patient information
+        doctor_name = patient_info['doctor']
+        preferred_day = patient_info['preferred_day']
+        preferred_time = patient_info['preferred_time']
+
+        # Check if the preferred day and time are already booked for the doctor
+        check_query = """SELECT * FROM patients 
+                         WHERE doctor_booked = %s AND appointment_day = %s AND appointment_time = %s"""
+        cursor.execute(check_query, (doctor_name, preferred_day, preferred_time))
         result = cursor.fetchone()
 
         if result:
-            available_time_slots = result[0].split(", ")  # Convert the available_time_slots string to a list
+            # The time slot is already booked
+            st.markdown("The selected time slot on {} at {} is already booked. Please choose another time slot.".format(preferred_day, preferred_time))
+            st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
+        else:
+            # The time slot is available, proceed with booking
+            insert_query = """INSERT INTO patients (full_name, problem, contact, doctor_booked, appointment_day, appointment_time) 
+                              VALUES (%s, %s, %s, %s, %s, %s)"""
+            cursor.execute(insert_query, (
+                patient_info['name'], 
+                patient_info['problem'], 
+                patient_info['contact'], 
+                doctor_name, 
+                preferred_day, 
+                preferred_time
+            ))
+            connection.commit()
 
-            preferred_time_slot = patient_info['preferred_time_slot']
+            st.markdown("Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time))
 
-            if preferred_time_slot in available_time_slots:
-                # Slot is available, proceed with booking
-                available_time_slots.remove(preferred_time_slot)  # Remove the booked slot
+        connection.close()
 
-                # Update the doctor's appointment_booked and available_time_slots
-                update_query = """UPDATE doctors SET available_time_slots = %s WHERE full_name = %s"""
-                cursor.execute(update_query, (", ".join(available_time_slots), doctor_name))
-                connection.commit()
+def reschedule_appointment(new_info):
+    connection = mysql.connector.connect(
+    host='localhost',
+    database='hospital',
+    user='root',
+    password=os.getenv('mysql_password')
+)
+    
+    if connection.is_connected():
+        cursor = connection.cursor()
 
-                # Insert patient info into patients table
-                insert_query = """INSERT INTO patients (full_name, problem,contact, doctor_booked, appointment_day, appointmnet_time) 
-                                  VALUES (%s, %s, %s, %s, %s)"""
-                cursor.execute(insert_query, (patient_info['name'],patient_info['problem'], patient_info['contact'], doctor_name, patient_info['preferred_day'], preferred_time_slot))
-                connection.commit()
-                st.markdown("Appointment booked successfully.")
+        # Fetch the current appointment details
+        fetch_query = """SELECT doctor_booked, appointment_day, appointment_time 
+                         FROM patients WHERE full_name = %s"""
+        cursor.execute(fetch_query, (new_info['patient_name'],))
+        result = cursor.fetchone()
+        
+        if result:
+            doctor_name, current_day, current_time = result
+
+            # Check if the new day and time slot are already booked for the same doctor
+            check_query = """SELECT * FROM patients 
+                             WHERE doctor_booked = %s AND appointment_day = %s AND appointment_time = %s"""
+            cursor.execute(check_query, (doctor_name, new_info['new_day'], new_info['new_time']))
+            check_result = cursor.fetchone()
+
+            if check_result:
+                # New time slot is already booked
+                st.markdown("The selected new time slot on {} at {} is already booked. Please choose another time slot.".format(new_info['new_day'], new_info['new_time']))
+                st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
             else:
-                # Slot is not available
-                st.markdown("The selected time slot is occupied. Please choose another time slot.")
+                # The new time slot is available, proceed with rescheduling
+                update_patient_query = """UPDATE patients 
+                                          SET appointment_day = %s, appointment_time = %s 
+                                          WHERE full_name = %s"""
+                cursor.execute(update_patient_query, (new_info['new_day'], new_info['new_time'], new_info['patient_name']))
+                connection.commit()
+
+                st.markdown("Appointment rescheduled successfully to {} on {}.".format(new_info['new_time'], new_info['new_day']))
+        else:
+            st.markdown("Patient not found.")
+
+        connection.close()
+
+          
+def cancel_appointment(patient_name):
+    connection = mysql.connector.connect(
+        host='localhost',
+        database='hospital',
+        user='root',
+        password=os.getenv('mysql_password')
+    )
+
+    if connection.is_connected():
+        cursor = connection.cursor()
+
+        # Fetch the current appointment details for the patient
+        fetch_query = """SELECT doctor_booked, appointment_day, appointment_time 
+                         FROM patients WHERE full_name = %s"""
+        cursor.execute(fetch_query, (patient_name,))
+        result = cursor.fetchone()
+        
+        if result:
+            doctor_name, appointment_day, appointment_time = result
+
+            # Remove the patient's appointment from the patients table
+            delete_patient_query = """DELETE FROM patients WHERE full_name = %s"""
+            cursor.execute(delete_patient_query, (patient_name,))
+            
+            # Commit the changes
+            connection.commit()
+
+            st.markdown(f"Appointment with {doctor_name} on {appointment_day} at {appointment_time} canceled successfully.")
+        else:
+            st.markdown("Patient not found.")
         
         connection.close()
 
 # Function to retrieve doctors' information from the database
 def retrieve_database_info():
-    doctor_list = []
+    connection = mysql.connector.connect(
+    host='localhost',
+    database='hospital',
+    user='root',
+    password=os.getenv('mysql_password')
+)
     if connection.is_connected():
-        cursor = connection.cursor()
-        query = 'SELECT * FROM doctors'
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        column_names = [desc[0] for desc in cursor.description]
-        doctor_list = [dict(zip(column_names, row)) for row in rows]
-        cursor.close()
-        connection.close()
-    doctors_info = '\n'.join([str(doctor) for doctor in doctor_list])
-    return doctors_info
+        doctor_list = []
+        if connection.is_connected():
+            cursor = connection.cursor()
+            query = 'SELECT * FROM doctors'
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            column_names = [desc[0] for desc in cursor.description]
+            doctor_list = [dict(zip(column_names, row)) for row in rows]
+            cursor.close()
+            connection.close()
+        doctors_info = '\n'.join([str(doctor) for doctor in doctor_list])
+        return doctors_info
 
 doctors_info = retrieve_database_info()
 
-# Initialize the chat history
+#Initialize the chat history
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content": "You are a hospital chatbot that answers doctor-related questions and books appointments. You have access to the hospital's doctor information."},
-        {"role": "system", "content": f"Doctor's information: {doctors_info}"},
+        {"role": "system", "content": "You are a hospital's chatbot that responds to people wanting to book an appointment with a doctor. You have access to the hospital's doctor information to answer their questions."},
+        {"role": "system", "content": f"Here is the doctor's information: {doctors_info}"},
         {"role": "system", "content": """
- If the user asks a general conversational question or inquiries about a doctor,convey suitable doctor's information that is provided to you to the user. always, recommend doctor based on the user's problem and doctor's specialization. your answer should be in following format:
-{"response": "Your response to the question here", "schedule": "no"}
+If the user asks a conversational question ,reply as you wish, but in the following dictionary format,keeping 'schedule' as no (this is crucial).
+Example for conversational question:
+{"response":"your reply","schedule":"no"}     
+             
+If a user wants to know about different doctor's information, respond with the relevant information from the doctor's information you have, in a dictionary format as shown below and set 'schedule' to 'no'.
+Example for inquiry of doctor's information:
+{"response": "Dr. Alice Smith is available from Monday to Friday at 11:00 AM-12:00 AM and 2:00 PM-3:00 PM.", "schedule": "no"}
 
-If a user says/wants to book an appointment, ask for their full name,problem(if you don't know),contact details, preferred appointment day, preferred appointment time, and the doctor they want to see(if you don't know). Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
+always try to suggest doctors that the patient must/should visit based on doctors specialization and patient's problem.
+         
+If a user says to book an appointment, first ask for their full name,problem, contact details, and preferred appointment day, preferred time and doctor they want to visit. Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
 Example for booking an appointment after the user provides the details:
-{"response": "sure,wait a minute....", "patient_info": {"name": "John Doe","problem":"backpain","contact": "123-456-7890", "preferred_day": "Monday","preferred_time":"12-12:30","doctor": "Dr. Smith"}, "schedule": "yes"}
-"""}
+{"response": "your appointment has been scheduled with given doctor for given day at given time.You will receive a conformation email soon. ", "patient_info": {"name": "John Doe","contact": "123-456-7890", "problem": "Headache", "preferred_day": "Monday","preferred_time":"2:00 PM-3:00 PM", "doctor": "Dr. Smith"}, "schedule": "yes"}
+
+sometime, user might say to reschedule the appointment, in such cases,first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
+Example for rescheduleing the appointment:
+{"response":"your appointment has been rescheduled for given day and given time. You will receive a conformation email soon.","new_info":{"patient_name":" John Doe","new_day": "Tuesday","new_time","11:00 AM - 12:00 PM"},"schedule":"reschedule"}        
+
+lastly, if the user says to cancel their appointment, ask for their full_name (this name must be what they used for booking the appointment) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the name is provided to you.
+Example for cancelling the appointment:
+ {"response":"your appointment with given doctor has been cancelled. you will receive a conformation email soon","patient_name":"John Doe","schedule":"cancel"}                 
+         
+ Note that, there are book_appointment,reschedule_appointment and cancel_appointment functions defined to do the appointment,rescheduling and cancellation job. you just need to respond in the corresponding format as shown above to trigger these functions.        
+         """}
     ]
 # Display chat messages excluding system messages
 for message in st.session_state.messages:
     if message["role"] != "system":
         if message["role"] == "assistant":
             try:
-                
                 json_objects = message["content"].splitlines()
                 for json_str in json_objects:
                     if json_str.strip():  
@@ -113,10 +218,8 @@ if question:
     # Display user message to the container
     with st.chat_message("user"):
         st.markdown(question)
-
     # Add the message to the history
     st.session_state.messages.append({"role": "user", "content": question})
-
     with st.chat_message("assistant"):
         # Generate a response from the assistant
         generated = client.chat.completions.create(
@@ -127,7 +230,7 @@ if question:
             stream=False,
         )
         response_content = generated.choices[0].message.content
-
+        # st.markdown(response_content)
         try:
             # Extract JSON from the response content
             json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
@@ -135,15 +238,24 @@ if question:
                 response_dict = json.loads(json_match.group())
                 if response_dict['schedule'] == 'no':
                     st.markdown(response_dict['response'])
+
                 elif response_dict['schedule'] == 'yes':
                     patient_info = response_dict['patient_info']
-                    book_appointment(patient_info['doctor'], patient_info)
+                    book_appointment(patient_info)
                     st.markdown(response_dict['response'])
 
+                elif response_dict['schedule']=='reschedule':
+                    new_info = response_dict['new_info']
+                    reschedule_appointment(new_info)
+                    st.markdown(response_dict['response'])
+
+                elif response_dict['schedule']=='cancel':
+                    patient_name=response_dict['patient_name']
+                    cancel_appointment(patient_name)
+                    st.markdown(response_dict['response'])
             else:
                 st.error("No valid JSON found in the response.")
         except json.JSONDecodeError:
             st.error("Failed to parse response as JSON.")
-
     # Add the assistant's response to the history
     st.session_state.messages.append({"role": "assistant", "content": response_content})
