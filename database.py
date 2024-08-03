@@ -4,7 +4,7 @@ import mysql.connector
 db_connection = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="Sanim#$100."
+    password="DB_password"
 )
 
 cursor = db_connection.cursor()
