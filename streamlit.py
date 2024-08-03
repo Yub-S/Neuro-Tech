@@ -17,9 +17,9 @@ AI71_BASE_URL = "https://api.ai71.ai/v1/"
 api_key = os.getenv('AI71_API_KEY')
 client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
-st.title("Appointment-Scheduler")
+st.title("MediShed")
 
-def send_emails(patient_info, text_to_send):
+def send_emails(patient_email, text_to_send):
     try:
         # Email server setup
         server = smtplib.SMTP('smtp.gmail.com', 587)
@@ -31,12 +31,12 @@ def send_emails(patient_info, text_to_send):
         server.login(sender_email, sender_password)
 
         # Compose the email
-        subject = "Appointment Confirmation"
-        body = f"Appointment booked successfully for {patient_info['name']} on {patient_info['preferred_day']} at {patient_info['preferred_time']}"
+        subject = "Confirmation mail"
+        body = f"{text_to_send}"
 
         msg = MIMEMultipart()
         msg['From'] = sender_email
-        msg['To'] = patient_info['contact']
+        msg['To'] = patient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
 
@@ -82,21 +82,21 @@ def book_appointment(patient_info):
             st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
         else:
             # The time slot is available, proceed with booking
-            insert_query = """INSERT INTO patients (full_name, problem, contact, doctor_booked, appointment_day, appointment_time) 
+            insert_query = """INSERT INTO patients (full_name, problem,email, doctor_booked, appointment_day, appointment_time) 
                               VALUES (%s, %s, %s, %s, %s, %s)"""
             cursor.execute(insert_query, (
                 patient_info['name'], 
                 patient_info['problem'], 
-                patient_info['contact'], 
+                patient_info['email'], 
                 doctor_name, 
                 preferred_day, 
                 preferred_time
             ))
             connection.commit()
 
-            marking="Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time)
-            st.markdown(marking)
-            send_emails(patient_info,marking) 
+            conformation_text="Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time)
+            # st.markdown(marking)
+            send_emails(patient_info['email'],conformation_text) 
 
         connection.close()
 
@@ -112,13 +112,13 @@ def reschedule_appointment(new_info):
         cursor = connection.cursor()
 
         # Fetch the current appointment details
-        fetch_query = """SELECT doctor_booked, appointment_day, appointment_time 
+        fetch_query = """SELECT email,doctor_booked, appointment_day, appointment_time 
                          FROM patients WHERE full_name = %s"""
         cursor.execute(fetch_query, (new_info['patient_name'],))
         result = cursor.fetchone()
         
         if result:
-            doctor_name, current_day, current_time = result
+            email,doctor_name, current_day, current_time = result
 
             # Check if the new day and time slot are already booked for the same doctor
             check_query = """SELECT * FROM patients 
@@ -138,7 +138,9 @@ def reschedule_appointment(new_info):
                 cursor.execute(update_patient_query, (new_info['new_day'], new_info['new_time'], new_info['patient_name']))
                 connection.commit()
 
-                st.markdown("Appointment rescheduled successfully to {} on {}.".format(new_info['new_time'], new_info['new_day']))
+                confirmation_text="Appointment rescheduled successfully to {} on {}.".format(new_info['new_time'], new_info['new_day'])
+                send_emails(email,confirmation_text)
+                
         else:
             st.markdown("Patient not found.")
 
@@ -157,13 +159,13 @@ def cancel_appointment(patient_name):
         cursor = connection.cursor()
 
         # Fetch the current appointment details for the patient
-        fetch_query = """SELECT doctor_booked, appointment_day, appointment_time 
+        fetch_query = """SELECT email,doctor_booked, appointment_day, appointment_time 
                          FROM patients WHERE full_name = %s"""
         cursor.execute(fetch_query, (patient_name,))
         result = cursor.fetchone()
         
         if result:
-            doctor_name, appointment_day, appointment_time = result
+            email,doctor_name, appointment_day, appointment_time = result
 
             # Remove the patient's appointment from the patients table
             delete_patient_query = """DELETE FROM patients WHERE full_name = %s"""
@@ -172,7 +174,8 @@ def cancel_appointment(patient_name):
             # Commit the changes
             connection.commit()
 
-            st.markdown(f"Appointment with {doctor_name} on {appointment_day} at {appointment_time} canceled successfully.")
+            confirmation_text = f"Appointment with {doctor_name} on {appointment_day} at {appointment_time} canceled successfully."
+            send_emails(email,confirmation_text)
         else:
             st.markdown("Patient not found.")
         
@@ -217,17 +220,17 @@ If a user wants to know about different doctor's information, respond with the r
 Example for inquiry of doctor's information:
 {"response": "Dr. Alice Smith is available from Monday to Friday at 11:00 AM-12:00 AM and 2:00 PM-3:00 PM.", "schedule": "no"}
 
-always try to suggest doctors that the patient must/should visit based on doctors specialization and patient's problem.
+always try to suggest/recommend doctors that are related to or specialized at that user's problem. such as a cardiologist for heart problems and a dermatologist for skin and hair problems.
          
-If a user says to book an appointment, first ask for their full name,problem, contact details, and preferred appointment day, preferred time and doctor they want to visit. Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
+If a user says to book an appointment, first ask for their full name,problem,preferred appointment day, preferred time, contact email, and doctor they want to visit(if you don't know). Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
 Example for booking an appointment after the user provides the details:
-{"response": "your appointment has been scheduled with given doctor for given day at given time.You will receive a conformation email soon. ", "patient_info": {"name": "John Doe","contact": "123-456-7890", "problem": "Headache", "preferred_day": "Monday","preferred_time":"2:00 PM-3:00 PM", "doctor": "Dr. Smith"}, "schedule": "yes"}
+{"response": "your appointment has been scheduled with given doctor for given day at given time.You will receive a conformation email soon. ", "patient_info": {"name": "John Doe","problem": "Headache", "preferred_day": "Monday","preferred_time":"2:00 PM-3:00 PM","email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, "schedule": "yes"}
 
-sometime, user might say to reschedule the appointment, in such cases,first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
+sometime, user might say to reschedule the appointment, in such cases,at first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
 Example for rescheduleing the appointment:
 {"response":"your appointment has been rescheduled for given day and given time. You will receive a conformation email soon.","new_info":{"patient_name":" John Doe","new_day": "Tuesday","new_time","11:00 AM - 12:00 PM"},"schedule":"reschedule"}        
 
-lastly, if the user says to cancel their appointment, ask for their full_name (this name must be what they used for booking the appointment) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the name is provided to you.
+lastly, if the user says to cancel their appointment, ask for their full_name only (this name must be what they used for booking the appointment) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the name is provided to you.
 Example for cancelling the appointment:
  {"response":"your appointment with given doctor has been cancelled. you will receive a conformation email soon","patient_name":"John Doe","schedule":"cancel"}                 
          
