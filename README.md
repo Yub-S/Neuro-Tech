@@ -58,7 +58,7 @@ On the project folder:
 
 > ```pip install -r requirements.txt```
 
-###.env file must be in this format:<br>
+### .env file must be in this format:<br>
 AI71_API_KEY="api_key_of_falcon_llm"<br>
 mysql_password="your_sql_password_here"<br>
 email="your_email_with_app_password"<br>
