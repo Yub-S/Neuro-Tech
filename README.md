@@ -40,7 +40,7 @@
 - **Error Management:** Handles potential issues gracefully, providing clear feedback to users.
 - **Data Privacy:** Adheres to healthcare regulations, ensuring the privacy and security of patient information during all communications and database operations.
 
-### How Medi-Sched works?
+### How Medi Sched works?
 We have fed the doctor’s info from database to the falcon llm and the llm holds a conversation with user and asks for the user input. Then after it receives required information it generates a response in dictionary format.
 We use that response to extract json and use the key we need to trigger 3 functions as per the wish of users namely:
 book_appointment
