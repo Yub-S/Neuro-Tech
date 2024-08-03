@@ -184,11 +184,11 @@ def cancel_appointment(patient_name):
 # Function to retrieve doctors' information from the database
 def retrieve_database_info():
     connection = mysql.connector.connect(
-    host='localhost',
-    database='hospital',
-    user='root',
-    password=os.getenv('mysql_password')
-)
+        host='sql12.freesqldatabase.com',
+        database='sql12723819',
+        user='sql12723819',
+        password='Xz4KnQSeQE'
+    )
     if connection.is_connected():
         doctor_list = []
         if connection.is_connected():
