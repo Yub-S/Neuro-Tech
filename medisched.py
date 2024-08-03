@@ -17,7 +17,7 @@ AI71_BASE_URL = "https://api.ai71.ai/v1/"
 api_key = os.getenv('AI71_API_KEY')
 client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
-st.title("MediShed")
+st.title("MediSched")
 
 def send_emails(patient_email, text_to_send):
     try:
