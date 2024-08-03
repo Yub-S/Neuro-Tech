@@ -2,7 +2,7 @@
 ### Contents:
 - [Introduction](https://github.com/Yub-S/Neuro-tech?tab=readme-ov-file#introduction)
 - [Major Highlights](https://github.com/Yub-S/Neuro-tech?tab=readme-ov-file#major-highlights)
-- [How Medi-Sched works?](https://github.com/Yub-S/Neuro-tech?tab=readme-ov-file#how-medi-sched-works?)
+- [How Medi-Sched works?](https://github.com/Yub-S/Neuro-tech?tab=readme-ov-file#how-medisched-works)
 
 ### Introduction
  MediShed is an intelligent chatbot application designed to streamline the process of booking, rescheduling, and canceling patient appointments with doctors. By leveraging Falcon LLM, MediShed provides a user-friendly interface that efficiently handles patient inquiries and appointment management. This reduces administrative burdens on hospital staff and enhances the overall patient experience. With features like real-time doctor information retrieval, automated email confirmations, and robust error handling, MediShed ensures seamless and accurate appointment scheduling.
@@ -40,7 +40,7 @@
 - **Error Management:** Handles potential issues gracefully, providing clear feedback to users.
 - **Data Privacy:** Adheres to healthcare regulations, ensuring the privacy and security of patient information during all communications and database operations.
 
-### How Medi Sched works?
+### How MediSched works?
 We have fed the doctor’s info from database to the falcon llm and the llm holds a conversation with user and asks for the user input. Then after it receives required information it generates a response in dictionary format.
 We use that response to extract json and use the key we need to trigger 3 functions as per the wish of users namely:
 book_appointment
