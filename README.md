@@ -41,9 +41,12 @@
 - **Data Privacy:** Adheres to healthcare regulations, ensuring the privacy and security of patient information during all communications and database operations.
 
 ### How MediSched works?
-We have fed the doctor’s info from database to the falcon llm and the llm holds a conversation with user and asks for the user input. Then after it receives required information it generates a response in dictionary format.
-We use that response to extract json and use the key we need to trigger 3 functions as per the wish of users namely:
-book_appointment
-reschedule_appointment
-cancel_appointment
-In each of these functions we have triggered send_emails function to send confirmation to the user.
+- Doctor's information is fed from the database to Falcon LLM.
+- The LLM converses with the user to gather necessary input.
+- Upon receiving the required information, the LLM generates a response in dictionary format.
+- The response is converted to JSON to extract the needed keys.
+- The extracted keys trigger one of three functions based on user request:
+  - `book_appointment`
+  - `reschedule_appointment`
+  - `cancel_appointment`
+- Each of these functions triggers the `send_emails` function to send a confirmation to the user.
