@@ -17,7 +17,7 @@ AI71_BASE_URL = "https://api.ai71.ai/v1/"
 api_key = os.getenv('AI71_API_KEY')
 client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
 
-st.title("MediShed")
+st.title("MediSched")
 
 def send_emails(patient_email, text_to_send):
     try:
@@ -79,7 +79,7 @@ def book_appointment(patient_info):
         if result:
             # The time slot is already booked
             st.markdown("The selected time slot on {} at {} is already booked. Please choose another time slot.".format(preferred_day, preferred_time))
-            st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
+            st.session_state.messages.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
         else:
             # The time slot is available, proceed with booking
             insert_query = """INSERT INTO patients (full_name, problem,email, doctor_booked, appointment_day, appointment_time) 
@@ -129,7 +129,7 @@ def reschedule_appointment(new_info):
             if check_result:
                 # New time slot is already booked
                 st.markdown("The selected new time slot on {} at {} is already booked. Please choose another time slot.".format(new_info['new_day'], new_info['new_time']))
-                st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
+                st.session_state.messages.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
             else:
                 # The new time slot is available, proceed with rescheduling
                 update_patient_query = """UPDATE patients 
@@ -226,11 +226,11 @@ If a user says to book an appointment, first ask for their full name,problem,pre
 Example for booking an appointment after the user provides the details:
 {"response": "your appointment has been scheduled with given doctor for given day at given time.You will receive a conformation email soon. ", "patient_info": {"name": "John Doe","problem": "Headache", "preferred_day": "Monday","preferred_time":"2:00 PM-3:00 PM","email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, "schedule": "yes"}
 
-sometime, user might say to reschedule the appointment, in such cases,at first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
+sometime, user might say/want to reschedule the appointment, in such cases,at first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
 Example for rescheduleing the appointment:
 {"response":"your appointment has been rescheduled for given day and given time. You will receive a conformation email soon.","new_info":{"patient_name":" John Doe","new_day": "Tuesday","new_time","11:00 AM - 12:00 PM"},"schedule":"reschedule"}        
 
-lastly, if the user says to cancel their appointment, ask for their full_name only (this name must be what they used for booking the appointment) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the name is provided to you.
+sometime, user might say/want to cancel the appointment, in such cases,at first ask for their fullname (we need this to access their appointment information) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the user provides the name .
 Example for cancelling the appointment:
  {"response":"your appointment with given doctor has been cancelled. you will receive a conformation email soon","patient_name":"John Doe","schedule":"cancel"}                 
          
@@ -272,7 +272,7 @@ if question:
             stream=False,
         )
         response_content = generated.choices[0].message.content
-        # st.markdown(response_content)
+        st.markdown(response_content)
         try:
             # Extract JSON from the response content
             json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
