@@ -1,10 +1,19 @@
 import mysql.connector
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Get the database connection details from environment variables
+
+mysql_password = os.getenv("mysql_password")
 
 # Establish a database connection
 db_connection = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="mysql_password"
+    password=mysql_password
 )
 
 cursor = db_connection.cursor()
