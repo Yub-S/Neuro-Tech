@@ -239,7 +239,7 @@ Instructions:
    - Ask for: full name, problem, preferred day, preferred time, email, and doctor if not provided.
    - If all details are provided, format the response like this:
      ```
-     {"response": "wait a minute...... You will receive a confirmation mail sortly.", 
+     {"response": "Your appointment has been scheduled with Dr. Smith for Monday at 2:00 PM. You will receive a confirmation email soon.", 
      "patient_info": {"name": "John Doe", "problem": "Headache", "preferred_day": "Monday", "preferred_time": "2:00 PM-3:00 PM", "email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, 
      "schedule": "yes"}
      ```
@@ -248,7 +248,7 @@ Instructions:
    - Ask for: user's full name, new day, new time.
    - If all details are provided, format the response like this:
      ```
-     {"response": "wait a minute...... You will receive a confirmation mail sortly.", 
+     {"response": "Your appointment has been rescheduled for Tuesday at 11:00 AM. You will receive a confirmation email soon.", 
      "new_info": {"patient_name": "John Doe", "new_day": "Tuesday", "new_time": "11:00 AM - 12:00 PM"}, 
      "schedule": "reschedule"}
      ```
@@ -257,7 +257,7 @@ Instructions:
    - Ask for: user's full name(only).
    - If the name is provided, format the response like this:
      ```
-     {"response": "wait a minute...... You will receive a confirmation mail sortly.", 
+     {"response": "Your appointment with Dr. Smith has been cancelled. You will receive a confirmation email soon.", 
      "patient_name": "John Doe", 
      "schedule": "cancel"}
      ```
