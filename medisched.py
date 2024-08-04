@@ -58,9 +58,8 @@ def book_appointment(patient_info):
     connection = mysql.connector.connect(
     host='localhost',
     database='hospital',
-    user='root', 
-    password=os.getenv('DB_PASSWORD'),
-    auth_plugin='mysql_native_password'
+    user='root',
+    password=os.getenv('mysql_password')
 )
     
     if connection.is_connected():
@@ -80,7 +79,7 @@ def book_appointment(patient_info):
         if result:
             # The time slot is already booked
             st.markdown("The selected time slot on {} at {} is already booked. Please choose another time slot.".format(preferred_day, preferred_time))
-            st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
+            st.session_state.messages.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
         else:
             # The time slot is available, proceed with booking
             insert_query = """INSERT INTO patients (full_name, problem,email, doctor_booked, appointment_day, appointment_time) 
@@ -106,8 +105,7 @@ def reschedule_appointment(new_info):
     host='localhost',
     database='hospital',
     user='root',
-    password=os.getenv('DB_PASSWORD'),
-    auth_plugin='mysql_native_password'
+    password=os.getenv('mysql_password')
 )
     
     if connection.is_connected():
@@ -116,7 +114,7 @@ def reschedule_appointment(new_info):
         # Fetch the current appointment details
         fetch_query = """SELECT email,doctor_booked, appointment_day, appointment_time 
                          FROM patients WHERE full_name = %s"""
-        cursor.execute(fetch_query, (new_info['patient_name'],))
+        cursor.execute(fetch_query, (new_info['name'],))
         result = cursor.fetchone()
         
         if result:
@@ -131,13 +129,13 @@ def reschedule_appointment(new_info):
             if check_result:
                 # New time slot is already booked
                 st.markdown("The selected new time slot on {} at {} is already booked. Please choose another time slot.".format(new_info['new_day'], new_info['new_time']))
-                st.message_state.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
+                st.session_state.messages.append({"role":"assistant","content":"The selected time slot is already booked. Please choose another time slot."})
             else:
                 # The new time slot is available, proceed with rescheduling
                 update_patient_query = """UPDATE patients 
                                           SET appointment_day = %s, appointment_time = %s 
                                           WHERE full_name = %s"""
-                cursor.execute(update_patient_query, (new_info['new_day'], new_info['new_time'], new_info['patient_name']))
+                cursor.execute(update_patient_query, (new_info['new_day'], new_info['new_time'], new_info['name']))
                 connection.commit()
 
                 confirmation_text="Appointment rescheduled successfully to {} on {}.".format(new_info['new_time'], new_info['new_day'])
@@ -154,8 +152,7 @@ def cancel_appointment(patient_name):
         host='localhost',
         database='hospital',
         user='root',
-        password=os.getenv('DB_PASSWORD'),
-        auth_plugin='mysql_native_password'
+        password=os.getenv('mysql_password')
     )
 
     if connection.is_connected():
@@ -190,8 +187,7 @@ def retrieve_database_info():
     host='localhost',
     database='hospital',
     user='root',
-    password=os.getenv('DB_PASSWORD'),
-    auth_plugin='mysql_native_password'
+    password=os.getenv('mysql_password')
 )
     if connection.is_connected():
         doctor_list = []
@@ -213,34 +209,55 @@ doctors_info = retrieve_database_info()
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content": "You are a hospital's chatbot that responds to people wanting to book an appointment with a doctor. You have access to the hospital's doctor information to answer their questions."},
+        {"role": "system", "content": "You are a hospital's chatbot that helps people book, reschedule, or cancel appointments with doctors. You have access to the hospital's doctor information."},
         {"role": "system", "content": f"Here is the doctor's information: {doctors_info}"},
         {"role": "system", "content": """
-If the user asks a conversational question ,reply as you wish, but in the following dictionary format,keeping 'schedule' as no (this is crucial).
-Example for conversational question:
-{"response":"your reply","schedule":"no"}     
-             
-If a user wants to know about different doctor's information, respond with the relevant information from the doctor's information you have, in a dictionary format as shown below and set 'schedule' to 'no'.
-Example for inquiry of doctor's information:
-{"response": "Dr. Alice Smith is available from Monday to Friday at 11:00 AM-12:00 AM and 2:00 PM-3:00 PM.", "schedule": "no"}
+Instructions:
 
-always try to suggest/recommend doctors that are related to or specialized at that user's problem. such as a cardiologist for heart problems and a dermatologist for skin and hair problems.
-         
-If a user says to book an appointment, first ask for their full name,problem,preferred appointment day, preferred time, contact email, and doctor they want to visit(if you don't know). Once the user provides these details, wrap the information in a dictionary format with keys: 'response', 'patient_info', and 'schedule', setting 'schedule' to 'yes' only if all the required details are provided.
-Example for booking an appointment after the user provides the details:
-{"response": "your appointment has been scheduled with given doctor for given day at given time.You will receive a conformation email soon. ", "patient_info": {"name": "John Doe","problem": "Headache", "preferred_day": "Monday","preferred_time":"2:00 PM-3:00 PM","email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, "schedule": "yes"}
+1. **Conversational Questions:**
+   - Reply freely but use the following format:
+     ```
+     {"response": "your reply", "schedule": "no"}
+     ```
 
-sometime, user might say to reschedule the appointment, in such cases,at first ask for their fullname, new day and new time they want to schedule the appointment. wrap this information in a dictionary format with keys 'response','new_info'and  'schedule',setting 'schedule' to 'reschedule' only if  all these details are provided.
-Example for rescheduleing the appointment:
-{"response":"your appointment has been rescheduled for given day and given time. You will receive a conformation email soon.","new_info":{"patient_name":" John Doe","new_day": "Tuesday","new_time","11:00 AM - 12:00 PM"},"schedule":"reschedule"}        
+2. **Doctor Information:**
+   - If asked about a doctor, respond with relevant details and use this format:
+     ```
+     {"response": "Dr. Alice Smith is available from Monday to Friday at 11:00 AM-12:00 AM and 2:00 PM-3:00 PM.", "schedule": "no"}
+     ```
+   - Recommend doctors based on the user's problem (e.g., cardiologist for heart issues).
 
-lastly, if the user says to cancel their appointment, ask for their full_name only (this name must be what they used for booking the appointment) and respond in a dictionary format with keys 'response','patient_name' and 'schedule',setting 'schedule' to 'cancel' only if the name is provided to you.
-Example for cancelling the appointment:
- {"response":"your appointment with given doctor has been cancelled. you will receive a conformation email soon","patient_name":"John Doe","schedule":"cancel"}                 
-         
- Note that, there are book_appointment,reschedule_appointment and cancel_appointment functions defined to do the appointment,rescheduling and cancellation job. you just need to respond in the corresponding format as shown above to trigger these functions.        
-         """}
+3. **Book an Appointment:**
+   - Ask for: full name, problem, preferred day, preferred time, email, and doctor if not provided earlier.
+   - If all details are provided, format the response like this:
+     ```
+     {"response": "Your appointment has been scheduled with Dr. Smith for Monday at 2:00 PM. You will receive a confirmation email soon.", 
+     "patient_info": {"name": "John Doe", "problem": "Headache", "preferred_day": "Monday", "preferred_time": "2:00 PM-3:00 PM", "email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, 
+     "schedule": "yes"}
+     ```
+
+4. **Reschedule an Appointment:**
+   - Ask for: full name, new day, new time if not provided earlier.
+   - If all details are provided, format the response like this:
+     ```
+     {"response": "Your appointment has been rescheduled for Tuesday at 11:00 AM. You will receive a confirmation email soon.", 
+     "new_info": {"name": "John Doe", "new_day": "Tuesday", "new_time": "11:00 AM - 12:00 PM"}, 
+     "schedule": "reschedule"}
+     ```
+
+5. **Cancel an Appointment:**
+   - Ask for: full name.
+   - If the name is provided, format the response like this:
+     ```
+     {"response": "Your appointment with Dr. Smith has been cancelled. You will receive a confirmation email soon.", 
+     "patient_name": "John Doe", 
+     "schedule": "cancel"}
+     ```
+
+- Note that, there are book_appointment,reschedule_appointment and cancel_appointment functions defined to do the appointment,rescheduling and cancellation job. you just need to respond in the corresponding format as shown above to trigger these functions.        
+        """}
     ]
+
 # Display chat messages excluding system messages
 for message in st.session_state.messages:
     if message["role"] != "system":
@@ -276,7 +293,7 @@ if question:
             stream=False,
         )
         response_content = generated.choices[0].message.content
-        #st.markdown(response_content)
+        # st.markdown(response_content)
         try:
             # Extract JSON from the response content
             json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
