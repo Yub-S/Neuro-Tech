@@ -237,7 +237,7 @@ Instructions:
      ```
 
 4. **Reschedule an Appointment:**
-   - Ask for: full name, new day, new time.
+   - Ask for: user's full name, new day, new time.
    - If all details are provided, format the response like this:
      ```
      {"response": "Your appointment has been rescheduled for Tuesday at 11:00 AM. You will receive a confirmation email soon.", 
@@ -246,7 +246,7 @@ Instructions:
      ```
 
 5. **Cancel an Appointment:**
-   - Ask for: full name.
+   - Ask for: user's full name.
    - If the name is provided, format the response like this:
      ```
      {"response": "Your appointment with Dr. Smith has been cancelled. You will receive a confirmation email soon.", 
