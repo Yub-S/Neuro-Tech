@@ -237,7 +237,7 @@ Instructions:
      ```
 
 4. **Reschedule an Appointment:**
-   - Ask for: full name, new day, new time if not provided earlier.
+   - Ask for:user's full name, new day, new time if not provided earlier.
    - If all details are provided, format the response like this:
      ```
      {"response": "Your appointment has been rescheduled for Tuesday at 11:00 AM. You will receive a confirmation email soon.", 
