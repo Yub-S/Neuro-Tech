@@ -1,7 +1,0 @@
-openai
-streamlit
-python-dotenv
-mysql-connector-python
-smtplib
-email
-re
