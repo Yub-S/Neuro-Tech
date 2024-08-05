@@ -58,12 +58,14 @@ On the project folder:
 
 
 > ```pip install -r requirements.txt```<br>
-> ```python database.py```
-> ```streamlit run MediSched.py``` Make sure you have your local MySQL database connected for running the application locally.
+> ```python database.py```<br>
+> ```streamlit run MediSched.py``` Make sure you have your local MySQL database connected for running the MediSched.py locally.
+
+>The medisched_host.py is connected to a cloud-based database from Freesqldatabase and is used for deploying our product on Streamlit Community Cloud.
 ### .env file must be in this format:<br>
 AI71_API_KEY="api_key_of_falcon_llm"<br>
 mysql_password="your_sql_password_here"<br>
-email="your_email_with_app_password"<br>
-password="your_16_character_long_password "<br>
+email="your_email"<br>
+password="your_16_character_long_app_password" one can obtain it from google app passwords.
 
 
