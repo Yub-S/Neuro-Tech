@@ -16,6 +16,7 @@
 ### Appointment Booking
 - **User-Friendly Booking Process:** Allows patients to book appointments by providing their full name, the problem they're experiencing, their preferred appointment day and time, contact email, and the doctor they want to visit.
 - **Availability Check:** Verifies doctor availability in real-time to prevent double bookings.
+- **Database Update:**   Automatically inserts patient appointment details into the database upon booking, thereby eliminating the need for any manual data entry and ensuring seamless record-keeping.
 - **Confirmation Emails:** Automatically sends appointment confirmation emails to patients, ensuring they have all necessary details.
 
 ### Appointment Rescheduling
@@ -58,10 +59,11 @@ On the project folder:
 
 > ```pip install -r requirements.txt```<br>
 > ```python database.py```
+> ```streamlit run MediSched.py``` Make sure you have your local MySQL database connected for running the application locally.
 ### .env file must be in this format:<br>
 AI71_API_KEY="api_key_of_falcon_llm"<br>
 mysql_password="your_sql_password_here"<br>
 email="your_email_with_app_password"<br>
-password="your_16_character_long_password"<br>
+password="your_16_character_long_password "<br>
 
 
