@@ -8,14 +8,16 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from groq import Groq
+import time
+import textwrap
 
 
 # Load environment variables
 load_dotenv()
-AI71_BASE_URL = "https://api.ai71.ai/v1/"
 
-api_key = os.getenv('AI71_API_KEY')
-client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
+# client = openai.OpenAI(api_key=api_key, base_url=AI71_BASE_URL)
+client = Groq()
 
 st.title("MediSched")
 
@@ -99,7 +101,8 @@ def book_appointment(patient_info):
 
             conformation_text="Appointment booked successfully for {} on {} at {}.".format(patient_info['name'], preferred_day, preferred_time)
             # st.markdown(marking)
-            send_emails(patient_info['email'],conformation_text) 
+            send_emails(patient_info['email'],conformation_text)
+
 
         connection.close()
 
@@ -237,16 +240,16 @@ Instructions:
 
 3. **Book an Appointment:**
    - Ask for: full name, problem, preferred day, preferred time, email, and doctor if not provided.
-   - If all details are provided, format the response like this:
+   - if even one detail is missing, ask for it in format 1. If all these details are provided, format the response like this, 
      ```
-     {"response": "Your appointment has been scheduled with Dr. Smith for Monday at 2:00 PM. You will receive a confirmation email soon.", 
+      "Your appointment has been scheduled with Dr. Smith for Monday at 2:00-3:00 PM. You will receive a confirmation email soon. ", 
      "patient_info": {"name": "John Doe", "problem": "Headache", "preferred_day": "Monday", "preferred_time": "2:00 PM-3:00 PM", "email": "JohnDoe@gmail.com", "doctor": "Dr. Smith"}, 
      "schedule": "yes"}
      ```
 
 4. **Reschedule an Appointment:**
    - Ask for: user's full name, new day, new time.
-   - If all details are provided, format the response like this:
+   - If only all details are provided, format the response like this:
      ```
      {"response": "Your appointment has been rescheduled for Tuesday at 11:00 AM. You will receive a confirmation email soon.", 
      "new_info": {"patient_name": "John Doe", "new_day": "Tuesday", "new_time": "11:00 AM - 12:00 PM"}, 
@@ -262,7 +265,8 @@ Instructions:
      "schedule": "cancel"}
      ```
 
- -Note that, there are book_appointment,reschedule_appointment and cancel_appointment functions defined to do the appointment,rescheduling and cancellation job. you just need to respond in the corresponding format as shown above to trigger these functions.        
+ -Note that, there are book_appointment,reschedule_appointment and cancel_appointment functions defined to do the appointment,rescheduling and cancellation job. you just need to respond in the corresponding format as shown above to trigger these functions.  
+lastly, after appointment is booked successfully, if the patients wants to show some medical reports to the doctor or tell more about the problem he/she is facing, direct them to use the additional section in the sidebar.       
          """}
     ]
 # Display chat messages excluding system messages
@@ -282,6 +286,25 @@ for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
 
+def display_in_chunks_with_cursor(response, chunk_size=10, delay=0.05):
+    message_placeholder = st.empty()
+    
+    # Initialize an empty string to accumulate the text
+    accumulated_text = ""
+    
+    # Iterate over the text in chunks
+    for i in range(0, len(response), chunk_size):
+        # Get the current chunk
+        chunk = response[i:i+chunk_size]
+        # Append the chunk to the accumulated text
+        accumulated_text += chunk
+        # Update the placeholder with the accumulated text and the cursor "▌"
+        message_placeholder.markdown(accumulated_text + "▌", unsafe_allow_html=True)
+        # Wait for 'delay' seconds before displaying the next chunk
+        time.sleep(delay)
+    
+    # After all chunks are displayed, remove the cursor
+    message_placeholder.markdown(accumulated_text, unsafe_allow_html=True)
 
 question = st.chat_input("How can I help you?")
 if question:
@@ -293,7 +316,7 @@ if question:
     with st.chat_message("assistant"):
         # Generate a response from the assistant
         generated = client.chat.completions.create(
-            model="tiiuae/falcon-180b-chat",
+            model="llama-3.1-70b-versatile",
             messages=[
                 {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
             ],
@@ -307,7 +330,8 @@ if question:
             if json_match:
                 response_dict = json.loads(json_match.group())
                 if response_dict['schedule'] == 'no':
-                    st.markdown(response_dict['response'])
+                    # st.markdown(response_dict['response'])
+                    display_in_chunks_with_cursor(response_dict['response'])
 
                 elif response_dict['schedule'] == 'yes':
                     patient_info = response_dict['patient_info']
